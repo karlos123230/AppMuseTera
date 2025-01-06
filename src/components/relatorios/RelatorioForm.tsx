@@ -11,6 +11,10 @@ import jsPDF from 'jspdf';
 
 type TipoRelatorio = 'sessao' | 'reavaliacao' | 'alta' | 'avaliacao_inicial' | 'evolucao_mensal' | 'evolucao_semestral' | 'familia' | 'equipe'
 
+function isTipoRelatorio(value: string): value is TipoRelatorio {
+  return ['sessao', 'reavaliacao', 'alta', 'avaliacao_inicial', 'evolucao_mensal', 'evolucao_semestral', 'familia', 'equipe'].includes(value)
+}
+
 const TIPOS_RELATORIO: Array<{ id: TipoRelatorio; label: string }> = [
   { id: 'sessao', label: 'Relatório de Sessão' },
   { id: 'evolucao_mensal', label: 'Relatório de Evolução Mensal' },
@@ -440,14 +444,7 @@ export function RelatorioForm({ onSubmit, initialData, tipo }: RelatorioFormProp
 
   const handleTipoChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const value = e.target.value
-    if (value === 'sessao' || 
-        value === 'reavaliacao' || 
-        value === 'alta' || 
-        value === 'avaliacao_inicial' || 
-        value === 'evolucao_mensal' || 
-        value === 'evolucao_semestral' || 
-        value === 'familia' || 
-        value === 'equipe') {
+    if (isTipoRelatorio(value)) {
       setTipoRelatorio(value)
     }
   }
