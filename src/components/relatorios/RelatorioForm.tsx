@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Card } from '@/components/ui/Card'
 import { PatientSelect } from '../processos/PatientSelect'
 import { Patient } from '@/types'
@@ -24,6 +24,8 @@ const TIPOS_RELATORIO: Array<{ id: TipoRelatorio; label: string }> = [
   { id: 'familia', label: 'Relatório para Família' },
   { id: 'equipe', label: 'Relatório para Equipe' }
 ]
+
+type TipoRelatorioWithEmpty = TipoRelatorio | ''
 
 // Campos específicos por tipo de relatório
 const CAMPOS_ESPECIFICOS = {
@@ -325,7 +327,13 @@ interface RelatorioFormProps {
 export function RelatorioForm({ onSubmit, initialData, tipo }: RelatorioFormProps) {
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null)
   const [formData, setFormData] = useState(initialData || {})
-  const [tipoRelatorio, setTipoRelatorio] = useState<TipoRelatorio>(tipo)
+  const [tipoRelatorio, setTipoRelatorio] = useState<TipoRelatorioWithEmpty>('')
+
+  useEffect(() => {
+    if (tipo) {
+      setTipoRelatorio(tipo)
+    }
+  }, [tipo])
 
   const handleInputChange = (secao: string, campo: string, valor: any) => {
     setFormData((prev: typeof formData) => ({
@@ -443,7 +451,7 @@ export function RelatorioForm({ onSubmit, initialData, tipo }: RelatorioFormProp
   };
 
   const handleTipoChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const selectedValue = e.target.value as TipoRelatorio
+    const selectedValue = e.target.value as TipoRelatorioWithEmpty
     if (TIPOS_RELATORIO.some(t => t.id === selectedValue)) {
       setTipoRelatorio(selectedValue)
     }
@@ -480,9 +488,10 @@ export function RelatorioForm({ onSubmit, initialData, tipo }: RelatorioFormProp
             <select
               className="w-full p-2 border rounded-lg"
               value={tipoRelatorio}
-              onChange={handleTipoChange}
+              onChange={(e) => setTipoRelatorio(e.target.value as TipoRelatorioWithEmpty)}
               required
             >
+              <option value="">Selecione o tipo de relatório...</option>
               {TIPOS_RELATORIO.map(tipo => (
                 <option key={tipo.id} value={tipo.id}>
                   {tipo.label}
