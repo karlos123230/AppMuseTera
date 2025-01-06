@@ -9,14 +9,16 @@ import { formatarData } from '@/utils/formatters'
 import { RelatorioPDF } from './RelatorioPDF'
 import jsPDF from 'jspdf';
 
+type TipoRelatorio = 'sessao' | 'reavaliacao' | 'alta' | 'avaliacao_inicial' | 'evolucao_mensal' | 'evolucao_semestral' | 'familia' | 'equipe'
+
 const TIPOS_RELATORIO = [
-  { id: 'sessao', label: 'Relatório de Sessão' },
-  { id: 'evolucao_mensal', label: 'Relatório de Evolução Mensal' },
-  { id: 'evolucao_semestral', label: 'Relatório de Evolução Semestral' },
-  { id: 'avaliacao', label: 'Relatório de Avaliação' },
-  { id: 'alta', label: 'Relatório de Alta' },
-  { id: 'familia', label: 'Relatório para Família' },
-  { id: 'equipe', label: 'Relatório para Equipe' }
+  { id: 'sessao' as TipoRelatorio, label: 'Relatório de Sessão' },
+  { id: 'evolucao_mensal' as TipoRelatorio, label: 'Relatório de Evolução Mensal' },
+  { id: 'evolucao_semestral' as TipoRelatorio, label: 'Relatório de Evolução Semestral' },
+  { id: 'avaliacao_inicial' as TipoRelatorio, label: 'Relatório de Avaliação' },
+  { id: 'alta' as TipoRelatorio, label: 'Relatório de Alta' },
+  { id: 'familia' as TipoRelatorio, label: 'Relatório para Família' },
+  { id: 'equipe' as TipoRelatorio, label: 'Relatório para Equipe' }
 ]
 
 // Campos específicos por tipo de relatório
@@ -313,13 +315,13 @@ const CONCLUSOES_ESPECIFICAS = {
 interface RelatorioFormProps {
   onSubmit: (data: any) => void
   initialData?: any
-  tipo: 'sessao' | 'reavaliacao' | 'alta' | 'avaliacao_inicial' | 'evolucao_mensal' | 'evolucao_semestral' | 'familia' | 'equipe'
+  tipo: TipoRelatorio
 }
 
 export function RelatorioForm({ onSubmit, initialData, tipo }: RelatorioFormProps) {
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null)
   const [formData, setFormData] = useState(initialData || {})
-  const [tipoRelatorio, setTipoRelatorio] = useState(tipo)
+  const [tipoRelatorio, setTipoRelatorio] = useState<TipoRelatorio | ''>('')
 
   const handleInputChange = (secao: string, campo: string, valor: any) => {
     setFormData((prev: typeof formData) => ({
@@ -467,7 +469,7 @@ export function RelatorioForm({ onSubmit, initialData, tipo }: RelatorioFormProp
             <select
               className="w-full p-2 border rounded-lg"
               value={tipoRelatorio}
-              onChange={(e) => setTipoRelatorio(e.target.value)}
+              onChange={(e) => setTipoRelatorio(e.target.value as TipoRelatorio)}
               required
             >
               <option value="">Selecione o tipo de relatório...</option>
