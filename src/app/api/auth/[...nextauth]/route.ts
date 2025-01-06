@@ -8,20 +8,25 @@ const handler = NextAuth({
     CredentialsProvider({
       credentials: {},
       async authorize(credentials: any) {
-        const user = await prisma.user.findUnique({
-          where: { email: credentials?.email }
-        })
+        try {
+          const user = await prisma.user.findUnique({
+            where: { email: credentials?.email }
+          })
 
-        if (!user?.password) return null
+          if (!user?.password) return null
 
-        const valid = await bcrypt.compare(credentials?.password || "", user.password)
-        if (!valid) return null
+          const valid = await bcrypt.compare(credentials?.password || "", user.password)
+          if (!valid) return null
 
-        return {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-          professionalRegister: user.professionalRegister
+          return {
+            id: user.id,
+            email: user.email,
+            name: user.name,
+            professionalRegister: user.professionalRegister
+          }
+        } catch (error) {
+          console.error("Auth error:", error)
+          return null
         }
       }
     })
