@@ -11,10 +11,6 @@ import jsPDF from 'jspdf';
 
 type TipoRelatorio = 'sessao' | 'reavaliacao' | 'alta' | 'avaliacao_inicial' | 'evolucao_mensal' | 'evolucao_semestral' | 'familia' | 'equipe'
 
-function isTipoRelatorio(value: string): value is TipoRelatorio {
-  return ['sessao', 'reavaliacao', 'alta', 'avaliacao_inicial', 'evolucao_mensal', 'evolucao_semestral', 'familia', 'equipe'].includes(value)
-}
-
 const TIPOS_RELATORIO: Array<{ id: TipoRelatorio; label: string }> = [
   { id: 'sessao', label: 'Relatório de Sessão' },
   { id: 'evolucao_mensal', label: 'Relatório de Evolução Mensal' },
@@ -24,8 +20,6 @@ const TIPOS_RELATORIO: Array<{ id: TipoRelatorio; label: string }> = [
   { id: 'familia', label: 'Relatório para Família' },
   { id: 'equipe', label: 'Relatório para Equipe' }
 ]
-
-type TipoRelatorioWithEmpty = TipoRelatorio | ''
 
 // Campos específicos por tipo de relatório
 const CAMPOS_ESPECIFICOS = {
@@ -327,13 +321,12 @@ interface RelatorioFormProps {
 export function RelatorioForm({ onSubmit, initialData, tipo }: RelatorioFormProps) {
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null)
   const [formData, setFormData] = useState(initialData || {})
-  const [tipoRelatorio, setTipoRelatorio] = useState<TipoRelatorioWithEmpty>('')
+  const [tipoRelatorio, setTipoRelatorio] = useState(tipo)
 
-  useEffect(() => {
-    if (tipo) {
-      setTipoRelatorio(tipo)
-    }
-  }, [tipo])
+  const handleTipoChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const value = e.target.value
+    setTipoRelatorio(value as TipoRelatorio)
+  }
 
   const handleInputChange = (secao: string, campo: string, valor: any) => {
     setFormData((prev: typeof formData) => ({
@@ -450,13 +443,6 @@ export function RelatorioForm({ onSubmit, initialData, tipo }: RelatorioFormProp
     doc.save(nomeArquivo);
   };
 
-  const handleTipoChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const selectedValue = e.target.value as TipoRelatorioWithEmpty
-    if (TIPOS_RELATORIO.some(t => t.id === selectedValue)) {
-      setTipoRelatorio(selectedValue)
-    }
-  }
-
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (!selectedPatient) return
@@ -488,7 +474,7 @@ export function RelatorioForm({ onSubmit, initialData, tipo }: RelatorioFormProp
             <select
               className="w-full p-2 border rounded-lg"
               value={tipoRelatorio}
-              onChange={(e) => setTipoRelatorio(e.target.value as TipoRelatorioWithEmpty)}
+              onChange={handleTipoChange}
               required
             >
               <option value="">Selecione o tipo de relatório...</option>
