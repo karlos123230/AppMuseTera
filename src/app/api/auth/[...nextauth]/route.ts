@@ -4,7 +4,7 @@ import { prisma } from '@/lib/prisma'
 import bcrypt from 'bcryptjs'
 import { NextAuthOptions } from 'next-auth'
 
-const authOptions: NextAuthOptions = {
+const authConfig: NextAuthOptions = {
   providers: [
     CredentialsProvider({
       name: 'credentials',
@@ -14,25 +14,21 @@ const authOptions: NextAuthOptions = {
       },
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) {
-          throw new Error('Por favor, preencha todos os campos')
+          throw new Error('Please fill in all fields')
         }
 
         const user = await prisma.user.findUnique({
-          where: {
-            email: credentials.email
-          }
+          where: { email: credentials.email }
         })
 
         if (!user || !user.password) {
-          console.log('Tentativa de login com email não cadastrado:', credentials.email)
-          throw new Error('Credenciais inválidas')
+          throw new Error('Invalid credentials')
         }
 
         const isValid = await bcrypt.compare(credentials.password, user.password)
 
         if (!isValid) {
-          console.log('Tentativa de login com senha incorreta para:', credentials.email)
-          throw new Error('Credenciais inválidas')
+          throw new Error('Invalid credentials')
         }
 
         return {
@@ -44,35 +40,31 @@ const authOptions: NextAuthOptions = {
       }
     })
   ],
+  pages: {
+    signIn: '/',
+    error: '/auth/error'
+  },
   callbacks: {
     async jwt({ token, user }) {
       if (user) {
-        token.professionalRegister = user.professionalRegister
         token.id = user.id
+        token.professionalRegister = user.professionalRegister
       }
       return token
     },
     async session({ session, token }) {
       if (session.user) {
+        session.user.id = token.id
         session.user.professionalRegister = token.professionalRegister as string | null
-        session.user.id = token.id as string
       }
       return session
     }
   },
-  pages: {
-    signIn: '/',
-    error: '/auth/error'
-  },
-  session: {
-    strategy: 'jwt',
-    maxAge: 30 * 24 * 60 * 60, // 30 days
-  },
+  session: { strategy: 'jwt' },
   secret: process.env.NEXTAUTH_SECRET,
   debug: process.env.NODE_ENV === 'development'
 }
 
-const handler = NextAuth(authOptions)
-
+const handler = NextAuth(authConfig)
 export const GET = handler
 export const POST = handler
