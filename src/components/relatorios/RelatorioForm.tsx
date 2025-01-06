@@ -321,7 +321,7 @@ interface RelatorioFormProps {
 export function RelatorioForm({ onSubmit, initialData, tipo }: RelatorioFormProps) {
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null)
   const [formData, setFormData] = useState(initialData || {})
-  const [tipoRelatorio, setTipoRelatorio] = useState<TipoRelatorio | ''>('')
+  const [tipoRelatorio, setTipoRelatorio] = useState<TipoRelatorio>(tipo)
 
   const handleInputChange = (secao: string, campo: string, valor: any) => {
     setFormData((prev: typeof formData) => ({
@@ -439,8 +439,17 @@ export function RelatorioForm({ onSubmit, initialData, tipo }: RelatorioFormProp
   };
 
   const handleTipoChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const value = e.target.value as TipoRelatorio | ''
-    setTipoRelatorio(value)
+    const value = e.target.value
+    if (value === 'sessao' || 
+        value === 'reavaliacao' || 
+        value === 'alta' || 
+        value === 'avaliacao_inicial' || 
+        value === 'evolucao_mensal' || 
+        value === 'evolucao_semestral' || 
+        value === 'familia' || 
+        value === 'equipe') {
+      setTipoRelatorio(value)
+    }
   }
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -477,7 +486,6 @@ export function RelatorioForm({ onSubmit, initialData, tipo }: RelatorioFormProp
               onChange={handleTipoChange}
               required
             >
-              <option value="">Selecione o tipo de relatório...</option>
               {TIPOS_RELATORIO.map(tipo => (
                 <option key={tipo.id} value={tipo.id}>
                   {tipo.label}
@@ -588,7 +596,6 @@ function renderCampo(campo: any, formData: any, onChange: (valor: any) => void, 
           value={formData[campo.id] || ''}
           onChange={(e) => onChange(e.target.value)}
         >
-          <option value="">Selecione...</option>
           {campo.opcoes?.map((opcao: any) => (
             <option key={opcao.id || opcao} value={opcao.id || opcao}>
               {opcao.label || opcao}
