@@ -1,10 +1,9 @@
-import NextAuth from 'next-auth'
 import CredentialsProvider from 'next-auth/providers/credentials'
 import { prisma } from '@/lib/prisma'
 import bcrypt from 'bcryptjs'
 import { NextAuthOptions } from 'next-auth'
 
-const authOptions: NextAuthOptions = {
+export const authOptions: NextAuthOptions = {
   providers: [
     CredentialsProvider({
       name: 'credentials',
@@ -39,7 +38,7 @@ const authOptions: NextAuthOptions = {
           id: user.id,
           email: user.email,
           name: user.name,
-          professionalRegister: user.professionalRegister
+          role: user.role
         }
       }
     })
@@ -47,14 +46,14 @@ const authOptions: NextAuthOptions = {
   callbacks: {
     async jwt({ token, user }) {
       if (user) {
-        token.professionalRegister = user.professionalRegister
+        token.role = user.role
         token.id = user.id
       }
       return token
     },
     async session({ session, token }) {
       if (session.user) {
-        session.user.professionalRegister = token.professionalRegister as string | null
+        session.user.role = token.role as string
         session.user.id = token.id as string
       }
       return session
@@ -71,8 +70,3 @@ const authOptions: NextAuthOptions = {
   secret: process.env.NEXTAUTH_SECRET,
   debug: process.env.NODE_ENV === 'development'
 }
-
-const handler = NextAuth(authOptions)
-
-export const GET = handler
-export const POST = handler
