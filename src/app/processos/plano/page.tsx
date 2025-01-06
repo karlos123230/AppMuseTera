@@ -2,7 +2,10 @@
 
 import { useState } from 'react'
 import { Card } from '@/components/ui/Card'
+<<<<<<< HEAD
 import { PatientSelect } from '@/components/processos/PatientSelect'
+=======
+>>>>>>> ed55b169351ee0aede8b22d80f6e1d5d3a55ea9a
 import { Patient } from '@/types'
 import { Logo } from '@/components/Logo'
 import { PlanoTerapeuticoPanel } from '@/components/processos/PlanoTerapeuticoPanel'
@@ -17,6 +20,7 @@ export default function PlanoPage() {
           <Logo size="sm" />
         </div>
 
+<<<<<<< HEAD
         <PatientSelect
           onSelect={setSelectedPatient}
           selectedId={selectedPatient?.id}
@@ -27,6 +31,11 @@ export default function PlanoPage() {
             <PlanoTerapeuticoPanel />
           </Card>
         )}
+=======
+        <Card>
+          <PlanoTerapeuticoPanel />
+        </Card>
+>>>>>>> ed55b169351ee0aede8b22d80f6e1d5d3a55ea9a
       </div>
     </div>
   )
