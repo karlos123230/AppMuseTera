@@ -1,197 +1,203 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import Script from 'next/script'
+import { Patient } from '@/types'
+import { PlanoTerapeutico } from '@/types/plano'
 import { Card } from '@/components/ui/Card'
 import { PatientSelect } from './PatientSelect'
-import { Patient } from '@/types'
-import { 
-  DocumentArrowDownIcon
-} from '@heroicons/react/24/outline'
-import { 
-  Diagnostico, 
-  OBJETIVOS_PADRAO, 
-  ATIVIDADES_PADRAO,
-  PlanoTerapeutico 
-} from '@/types/plano'
+import { formatarData } from '@/utils/formatters'
+import jsPDF from 'jspdf'
+import 'jspdf-autotable'
 
-export function PlanoTerapeuticoPanel() {
+interface PlanoTerapeuticoPanelProps {
+  onSave: (plano: PlanoTerapeutico) => void
+  initialData?: PlanoTerapeutico
+}
+
+export function PlanoTerapeuticoPanel({ onSave, initialData }: PlanoTerapeuticoPanelProps) {
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null)
-  const [diagnostico, setDiagnostico] = useState<Diagnostico>('TEA')
-  
-  // Filtra objetivos e atividades baseado no diagnóstico selecionado
-  const objetivosDisponiveis = OBJETIVOS_PADRAO.filter(
-    obj => obj.diagnosticos.includes(diagnostico)
-  )
-  
-  const atividadesDisponiveis = ATIVIDADES_PADRAO.filter(
-    atv => atv.diagnosticos.includes(diagnostico)
-  )
-
-  const [plano, setPlano] = useState<PlanoTerapeutico>({
-    id: '',
-    patientId: selectedPatient?.id || '',
+  const [formData, setFormData] = useState<PlanoTerapeutico>(initialData || {
     identificacao: {
-      nome: selectedPatient?.name || '',
-      idade: selectedPatient ? calculateAge(new Date(selectedPatient.dateOfBirth)) : 0,
-      diagnostico: diagnostico,
-      dataInicio: new Date(),
-      dataReavaliacao: new Date()
+      dataInicio: new Date().toISOString(),
+      dataReavaliacao: ''
     },
-    objetivosGerais: [],
-    objetivosEspecificos: {
-      interacaoSocial: [],
-      exploracaoSonora: [],
-      movimentacaoCorporal: [],
-      exploracaoVocal: [],
-      comportamentosRestritivos: []
-    },
-    atividades: atividadesDisponiveis.map(atv => ({
-      id: atv.id,
-      nome: atv.nome,
-      objetivo: atv.objetivo,
-      descricao: atv.descricao,
-      categoria: atv.categoria
-    })),
-    cronograma: [
-      {
-        semana: '1-2',
-        atividades: ['Roda Musical'],
-        objetivos: ['Interação Social']
-      }
-    ],
-    avaliacoes: [],
-    observacoesGerais: '',
-    status: 'ativo',
-    createdAt: new Date(),
-    updatedAt: new Date()
+    objetivos: [],
+    cronograma: []
   })
 
-  const [jspdfLoaded, setJspdfLoaded] = useState(false)
-  const [autotableLoaded, setAutotableLoaded] = useState(false)
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!selectedPatient) return
 
-  const handleDiagnosticoChange = (novoDiagnostico: Diagnostico) => {
-    setDiagnostico(novoDiagnostico)
-    // Atualiza objetivos e atividades baseado no novo diagnóstico
-    const novasAtividades = ATIVIDADES_PADRAO.filter(
-      atv => atv.diagnosticos.includes(novoDiagnostico)
-    )
-    
-    setPlano(prev => ({
-      ...prev,
-      identificacao: { ...prev.identificacao, diagnostico: novoDiagnostico },
-      atividades: novasAtividades.map(atv => ({
-        id: atv.id,
-        nome: atv.nome,
-        objetivo: atv.objetivo,
-        descricao: atv.descricao,
-        categoria: atv.categoria
-      }))
-    }))
-  }
-
-  const handleObjetivoToggle = (objetivo: typeof OBJETIVOS_PADRAO[0]) => {
-    setPlano(prev => ({
-      ...prev,
-      objetivosGerais: prev.objetivosGerais.includes(objetivo.texto)
-        ? prev.objetivosGerais.filter(texto => texto !== objetivo.texto)
-        : [...prev.objetivosGerais, objetivo.texto]
-    }))
-  }
-
-  const generatePDF = () => {
     try {
-      // Verificar se as bibliotecas estão carregadas
-      if (!jspdfLoaded || !autotableLoaded) {
-        throw new Error('Bibliotecas de PDF não carregadas. Aguarde e tente novamente.')
+      const planoCompleto = {
+        ...formData,
+        pacienteId: selectedPatient.id
       }
 
-      // Log detalhado para depuração
-      console.log('Dados para geração de PDF:', {
-        selectedPatient,
-        diagnostico,
-        plano: {
-          identificacao: plano.identificacao,
-          objetivosGerais: plano.objetivosGerais
-        }
-      })
+      await onSave(planoCompleto)
+    } catch (error) {
+      console.error('Erro ao salvar plano:', error)
+    }
+  }
 
-      // Verificar se o objeto jspdf está disponível
-      if (typeof window === 'undefined' || !window.jspdf || !window.jspdf.jsPDF) {
-        throw new Error('Biblioteca jsPDF não carregada')
+  const handleInputChange = (field: string, value: any) => {
+    setFormData(prev => ({
+      ...prev,
+      [field]: value
+    }))
+  }
+
+  const handleIdentificacaoChange = (field: string, value: any) => {
+    setFormData(prev => ({
+      ...prev,
+      identificacao: {
+        ...prev.identificacao,
+        [field]: value
       }
+    }))
+  }
 
-      // @ts-ignore
-      const jsPDF = window.jspdf.jsPDF
+  const adicionarObjetivo = () => {
+    setFormData(prev => ({
+      ...prev,
+      objetivos: [...prev.objetivos, { texto: '', categoria: '' }]
+    }))
+  }
+
+  const removerObjetivo = (index: number) => {
+    setFormData(prev => ({
+      ...prev,
+      objetivos: prev.objetivos.filter((_, i) => i !== index)
+    }))
+  }
+
+  const handleObjetivoChange = (index: number, field: string, value: string) => {
+    setFormData(prev => ({
+      ...prev,
+      objetivos: prev.objetivos.map((obj, i) => 
+        i === index ? { ...obj, [field]: value } : obj
+      )
+    }))
+  }
+
+  const adicionarSemana = () => {
+    setFormData(prev => ({
+      ...prev,
+      cronograma: [...prev.cronograma, { 
+        semana: `Semana ${prev.cronograma.length + 1}`,
+        atividades: [],
+        objetivos: []
+      }]
+    }))
+  }
+
+  const removerSemana = (index: number) => {
+    setFormData(prev => ({
+      ...prev,
+      cronograma: prev.cronograma.filter((_, i) => i !== index)
+    }))
+  }
+
+  const handleSemanaChange = (index: number, field: string, value: any) => {
+    setFormData(prev => ({
+      ...prev,
+      cronograma: prev.cronograma.map((semana, i) => 
+        i === index ? { ...semana, [field]: value } : semana
+      )
+    }))
+  }
+
+  const gerarPDF = async () => {
+    if (!selectedPatient) return
+
+    try {
       const doc = new jsPDF()
-
-      // Verificações de dados
-      if (!selectedPatient) {
-        throw new Error('Nenhum paciente selecionado')
-      }
 
       // Título
       doc.setFontSize(20)
-      doc.text('Plano Terapêutico Musicoterapêutico', doc.internal.pageSize.getWidth() / 2, 20, { align: 'center' })
+      doc.text('Plano Terapêutico', doc.internal.pageSize.getWidth() / 2, 20, { align: 'center' })
 
-      // Identificação do Paciente
-      doc.setFontSize(16)
-      doc.text('Identificação do Paciente', 20, 40)
-      
+      // Informações do paciente
       doc.setFontSize(12)
-      doc.text(`Nome: ${selectedPatient.name || 'Não informado'}`, 20, 50)
-      
-      const idade = selectedPatient.dateOfBirth 
-        ? calculateAge(new Date(selectedPatient.dateOfBirth)) 
-        : 'Não informada'
-      doc.text(`Idade: ${idade} anos`, 20, 57)
-      
-      doc.text(`Diagnóstico: ${diagnostico || 'Não informado'}`, 20, 64)
-      
-      const dataInicio = plano.identificacao.dataInicio 
-        ? plano.identificacao.dataInicio.toLocaleDateString('pt-BR') 
-        : 'Não informada'
-      doc.text(`Data de Início: ${dataInicio}`, 20, 71)
-      
-      if (plano.identificacao.dataReavaliacao) {
-        doc.text(`Reavaliação: ${plano.identificacao.dataReavaliacao.toLocaleDateString('pt-BR')}`, 20, 78)
+      doc.text(`Nome do Paciente: ${selectedPatient.name}`, 20, 40)
+      doc.text(`Data de Início: ${formatarData(formData.identificacao.dataInicio)}`, 20, 50)
+      if (formData.identificacao.dataReavaliacao) {
+        doc.text(`Data de Reavaliação: ${formatarData(formData.identificacao.dataReavaliacao)}`, 20, 60)
       }
 
-      // Objetivos Terapêuticos
-      doc.setFontSize(16)
-      doc.text('Objetivos Terapêuticos', 20, 95)
+      let yPos = 80
 
-      let yPos = 105
-      doc.setFontSize(12)
-      
-      // Verificar se há objetivos
-      if (!plano.objetivosGerais || plano.objetivosGerais.length === 0) {
-        doc.text('Nenhum objetivo geral definido', 20, yPos)
+      // Objetivos
+      if (formData.objetivos.length > 0) {
+        doc.setFontSize(14)
+        doc.text('Objetivos', 20, yPos)
         yPos += 10
-      } else {
-        plano.objetivosGerais.forEach((objetivo) => {
-          const objetivoText = `• ${objetivo}`
-          const objetivoPadrao = OBJETIVOS_PADRAO.find(obj => obj.texto === objetivo)
-          const categoriaText = `Categoria: ${objetivoPadrao?.categoria || 'Não categorizado'}`
-          
-          const splitObjetivo = doc.splitTextToSize(objetivoText, 170)
-          
-          if (yPos > 250) {
+
+        formData.objetivos.forEach((objetivo, index) => {
+          doc.setFontSize(10)
+          const text = `${index + 1}. ${objetivo.texto} (${objetivo.categoria})`
+          const lines = doc.splitTextToSize(text, 170)
+          doc.text(lines, 20, yPos)
+          yPos += (lines.length * 7)
+
+          if (yPos > doc.internal.pageSize.height - 20) {
             doc.addPage()
             yPos = 20
           }
+        })
+      }
 
-          doc.text(splitObjetivo, 20, yPos)
-          yPos += (splitObjetivo.length * 7)
-          doc.setFontSize(10)
-          doc.text(categoriaText, 25, yPos)
+      // Cronograma
+      if (formData.cronograma.length > 0) {
+        yPos += 10
+        doc.setFontSize(14)
+        doc.text('Cronograma', 20, yPos)
+        yPos += 10
+
+        formData.cronograma.forEach((semana, index) => {
           doc.setFontSize(12)
+          doc.text(semana.semana, 20, yPos)
+          yPos += 7
+
+          doc.setFontSize(10)
+          doc.text('Atividades:', 30, yPos)
+          yPos += 7
+
+          semana.atividades.forEach(atividade => {
+            const text = `• ${atividade}`
+            const lines = doc.splitTextToSize(text, 160)
+            doc.text(lines, 40, yPos)
+            yPos += (lines.length * 5)
+
+            if (yPos > doc.internal.pageSize.height - 20) {
+              doc.addPage()
+              yPos = 20
+            }
+          })
+
+          yPos += 5
+          doc.text('Objetivos:', 30, yPos)
+          yPos += 7
+
+          semana.objetivos.forEach(objetivo => {
+            const text = `• ${objetivo}`
+            const lines = doc.splitTextToSize(text, 160)
+            doc.text(lines, 40, yPos)
+            yPos += (lines.length * 5)
+
+            if (yPos > doc.internal.pageSize.height - 20) {
+              doc.addPage()
+              yPos = 20
+            }
+          })
+
           yPos += 10
         })
       }
 
       // Rodapé
-      const pageCount = doc.getNumberOfPages()
+      const pageCount = (doc as any).internal.getNumberOfPages()
       for (let i = 1; i <= pageCount; i++) {
         doc.setPage(i)
         doc.setFontSize(8)
@@ -204,208 +210,201 @@ export function PlanoTerapeuticoPanel() {
       }
 
       // Salvar o PDF
-      const nomeArquivo = selectedPatient.name 
-        ? selectedPatient.name.toLowerCase().replace(/\s+/g, '_') 
-        : 'plano_terapeutico'
-      doc.save(`plano_terapeutico_${nomeArquivo}.pdf`)
+      doc.save(`plano_terapeutico_${selectedPatient.name.toLowerCase().replace(/\s+/g, '_')}.pdf`)
     } catch (error) {
-      console.error('Erro detalhado ao gerar PDF:', {
-        errorMessage: error instanceof Error ? error.message : 'Erro desconhecido',
-        errorStack: error instanceof Error ? error.stack : 'Sem stack trace'
-      })
-      alert(`Erro ao gerar o PDF: ${error instanceof Error ? error.message : 'Erro desconhecido'}`)
+      console.error('Erro ao gerar PDF:', error)
+      alert('Erro ao gerar o PDF. Por favor, tente novamente.')
     }
   }
 
   return (
-    <>
-      <Script 
-        src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" 
-        strategy="lazyOnload"
-        onLoad={() => {
-          console.log('jsPDF carregado')
-          setJspdfLoaded(true)
-        }}
-        onError={() => {
-          console.error('Erro ao carregar jsPDF')
-          setJspdfLoaded(false)
-        }}
-      />
-      <Script 
-        src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.15/jspdf.plugin.autotable.min.js" 
-        strategy="lazyOnload"
-        onLoad={() => {
-          console.log('jsPDF AutoTable carregado')
-          setAutotableLoaded(true)
-        }}
-        onError={() => {
-          console.error('Erro ao carregar jsPDF AutoTable')
-          setAutotableLoaded(false)
-        }}
-      />
-
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
-        <div className="flex flex-col sm:flex-row justify-between items-center">
-          <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 mb-4 sm:mb-0">
-            MuseTera - Plano Terapêutico
-          </h1>
+    <Card>
+      <form onSubmit={handleSubmit} className="space-y-6 p-6">
+        <div>
+          <h2 className="text-lg font-medium text-gray-900">Plano Terapêutico</h2>
+          <p className="mt-1 text-sm text-gray-500">
+            Preencha os dados do plano terapêutico para o paciente.
+          </p>
         </div>
 
-        <Card className="w-full">
-          <div className="p-4 sm:p-6 space-y-4">
-            <PatientSelect 
-              onSelect={setSelectedPatient}
-              selectedId={selectedPatient?.id}
-              className="w-full"
-            />
-
-            {selectedPatient && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Diagnóstico Principal
-                  </label>
-                  <select
-                    className="w-full p-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                    value={diagnostico}
-                    onChange={(e) => handleDiagnosticoChange(e.target.value as Diagnostico)}
-                  >
-                    <optgroup label="Transtornos do Neurodesenvolvimento" className="font-semibold">
-                      <option value="TEA">Transtorno do Espectro Autista (TEA)</option>
-                      <option value="TDAH">TDAH</option>
-                      <option value="Deficiencia_Intelectual">Deficiência Intelectual</option>
-                    </optgroup>
-
-                    <optgroup label="Síndromes Genéticas" className="font-semibold">
-                      <option value="Sindrome_Down">Síndrome de Down</option>
-                    </optgroup>
-
-                    <optgroup label="Condições Neurológicas" className="font-semibold">
-                      <option value="Paralisia_Cerebral">Paralisia Cerebral</option>
-                      <option value="AVE">AVE/AVC</option>
-                      <option value="Parkinson">Doença de Parkinson</option>
-                      <option value="Alzheimer">Doença de Alzheimer</option>
-                      <option value="Demencia">Outras Demências</option>
-                    </optgroup>
-
-                    <optgroup label="Saúde Mental" className="font-semibold">
-                      <option value="Depressão">Depressão</option>
-                      <option value="Ansiedade">Ansiedade</option>
-                      <option value="Esquizofrenia">Esquizofrenia</option>
-                    </optgroup>
-
-                    <optgroup label="Deficiências Sensoriais" className="font-semibold">
-                      <option value="Deficiencia_Auditiva">Deficiência Auditiva</option>
-                      <option value="Deficiencia_Visual">Deficiência Visual</option>
-                      <option value="DPAC">Distúrbio do Processamento Auditivo Central</option>
-                    </optgroup>
-
-                    <option value="Outro">Outro</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Data de Início
-                  </label>
-                  <input
-                    type="date"
-                    className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                    value={plano.identificacao.dataInicio.toISOString().split('T')[0]}
-                    onChange={(e) => setPlano(prev => ({
-                      ...prev,
-                      identificacao: { ...prev.identificacao, dataInicio: new Date(e.target.value) }
-                    }))}
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Data Prevista para Reavaliação
-                  </label>
-                  <input
-                    type="date"
-                    className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                    value={plano.identificacao.dataReavaliacao.toISOString().split('T')[0]}
-                    onChange={(e) => setPlano(prev => ({
-                      ...prev,
-                      identificacao: { ...prev.identificacao, dataReavaliacao: new Date(e.target.value) }
-                    }))}
-                  />
-                </div>
-              </div>
-            )}
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700">
+              Paciente
+            </label>
+            <div className="mt-1">
+              <PatientSelect
+                onSelect={setSelectedPatient}
+                selectedId={selectedPatient?.id}
+              />
+            </div>
           </div>
-        </Card>
 
-        {selectedPatient && (
-          <>
-            <Card className="w-full">
-              <div className="p-4 sm:p-6">
-                <h3 className="text-md sm:text-lg font-semibold mb-4">Objetivos Disponíveis</h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {objetivosDisponiveis.map((objetivo) => (
-                    <label 
-                      key={objetivo.id} 
-                      className="flex items-start gap-3 p-2 rounded hover:bg-gray-50 cursor-pointer border border-transparent hover:border-gray-200 transition-all"
-                    >
-                      <div className="flex items-center h-5 mt-0.5">
-                        <input
-                          type="checkbox"
-                          checked={plano.objetivosGerais.includes(objetivo.texto)}
-                          onChange={() => handleObjetivoToggle(objetivo)}
-                          className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
-                        />
-                      </div>
-                      <div className="flex-1">
-                        <p className="text-sm text-gray-700">{objetivo.texto}</p>
-                        <span className="text-xs text-gray-500 mt-1">
-                          Categoria: {objetivo.categoria.charAt(0).toUpperCase() + objetivo.categoria.slice(1)}
-                        </span>
-                      </div>
-                    </label>
-                  ))}
-                </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700">
+              Data de Início
+            </label>
+            <div className="mt-1">
+              <input
+                type="date"
+                value={formData.identificacao.dataInicio.split('T')[0]}
+                onChange={(e) => handleIdentificacaoChange('dataInicio', e.target.value)}
+                className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+              />
+            </div>
+          </div>
 
-                <div className="mt-4 text-sm text-gray-600 text-center sm:text-left">
-                  {plano.objetivosGerais.length} objetivo(s) selecionado(s)
-                </div>
-              </div>
-            </Card>
+          <div>
+            <label className="block text-sm font-medium text-gray-700">
+              Data de Reavaliação
+            </label>
+            <div className="mt-1">
+              <input
+                type="date"
+                value={formData.identificacao.dataReavaliacao?.split('T')[0] || ''}
+                onChange={(e) => handleIdentificacaoChange('dataReavaliacao', e.target.value)}
+                className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+              />
+            </div>
+          </div>
 
-            <div className="flex justify-center sm:justify-end">
-              <button 
-                onClick={generatePDF} 
-                disabled={!jspdfLoaded || !autotableLoaded}
-                className={`
-                  w-full sm:w-auto max-w-xs
-                  ${!jspdfLoaded || !autotableLoaded 
-                    ? 'bg-gray-300 cursor-not-allowed' 
-                    : 'bg-blue-500 hover:bg-blue-600'
-                  } 
-                  text-white font-bold py-2 px-4 rounded transition-colors
-                `}
+          <div>
+            <div className="flex justify-between items-center">
+              <label className="block text-sm font-medium text-gray-700">
+                Objetivos
+              </label>
+              <button
+                type="button"
+                onClick={adicionarObjetivo}
+                className="text-sm text-indigo-600 hover:text-indigo-500"
               >
-                {!jspdfLoaded || !autotableLoaded 
-                  ? 'Carregando bibliotecas...' 
-                  : 'Gerar PDF'
-                }
+                Adicionar Objetivo
               </button>
             </div>
-          </>
-        )}
-      </div>
-    </>
-  )
-}
+            <div className="mt-2 space-y-4">
+              {formData.objetivos.map((objetivo, index) => (
+                <div key={index} className="flex gap-4">
+                  <div className="flex-1">
+                    <input
+                      type="text"
+                      value={objetivo.texto}
+                      onChange={(e) => handleObjetivoChange(index, 'texto', e.target.value)}
+                      placeholder="Descrição do objetivo"
+                      className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                    />
+                  </div>
+                  <div className="w-48">
+                    <select
+                      value={objetivo.categoria}
+                      onChange={(e) => handleObjetivoChange(index, 'categoria', e.target.value)}
+                      className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                    >
+                      <option value="">Selecione a categoria</option>
+                      <option value="Musicalidade">Musicalidade</option>
+                      <option value="Comunicação">Comunicação</option>
+                      <option value="Cognição">Cognição</option>
+                      <option value="Comportamento">Comportamento</option>
+                      <option value="Motricidade">Motricidade</option>
+                    </select>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => removerObjetivo(index)}
+                    className="text-red-600 hover:text-red-500"
+                  >
+                    Remover
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
 
-// Função auxiliar para calcular idade
-function calculateAge(dateOfBirth: Date): number {
-  const today = new Date()
-  let age = today.getFullYear() - dateOfBirth.getFullYear()
-  const m = today.getMonth() - dateOfBirth.getMonth()
-  if (m < 0 || (m === 0 && today.getDate() < dateOfBirth.getDate())) {
-    age--
-  }
-  return age
+          <div>
+            <div className="flex justify-between items-center">
+              <label className="block text-sm font-medium text-gray-700">
+                Cronograma
+              </label>
+              <button
+                type="button"
+                onClick={adicionarSemana}
+                className="text-sm text-indigo-600 hover:text-indigo-500"
+              >
+                Adicionar Semana
+              </button>
+            </div>
+            <div className="mt-2 space-y-6">
+              {formData.cronograma.map((semana, index) => (
+                <div key={index} className="border rounded-md p-4">
+                  <div className="flex justify-between items-center mb-4">
+                    <input
+                      type="text"
+                      value={semana.semana}
+                      onChange={(e) => handleSemanaChange(index, 'semana', e.target.value)}
+                      className="block w-48 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => removerSemana(index)}
+                      className="text-red-600 hover:text-red-500"
+                    >
+                      Remover Semana
+                    </button>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">
+                        Atividades
+                      </label>
+                      <div className="mt-1">
+                        <textarea
+                          value={semana.atividades.join('\n')}
+                          onChange={(e) => handleSemanaChange(index, 'atividades', e.target.value.split('\n'))}
+                          rows={3}
+                          placeholder="Digite uma atividade por linha"
+                          className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">
+                        Objetivos da Semana
+                      </label>
+                      <div className="mt-1">
+                        <textarea
+                          value={semana.objetivos.join('\n')}
+                          onChange={(e) => handleSemanaChange(index, 'objetivos', e.target.value.split('\n'))}
+                          rows={3}
+                          placeholder="Digite um objetivo por linha"
+                          className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div className="flex justify-end gap-4">
+          <button
+            type="button"
+            onClick={gerarPDF}
+            disabled={!selectedPatient}
+            className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50"
+          >
+            Gerar PDF
+          </button>
+          <button
+            type="submit"
+            className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+          >
+            Salvar Plano
+          </button>
+        </div>
+      </form>
+    </Card>
+  )
 }

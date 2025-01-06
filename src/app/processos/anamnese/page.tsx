@@ -78,11 +78,23 @@ export default function AnamnesePage() {
   )
 }
 
+interface FormData {
+  [key: string]: string | string[]
+  observacoes: string
+}
+
 function AnamneseForm({ patient }: { patient: Patient }) {
   const router = useRouter()
   const { addAnamnese } = useAnamneses()
-  const [formData, setFormData] = useState<Record<string, string | string[]>>({})
+  const [formData, setFormData] = useState<FormData>({ observacoes: '' })
   const [isSaving, setIsSaving] = useState(false)
+
+  const handleInputChange = (id: string, value: string | string[]) => {
+    setFormData(prev => ({
+      ...prev,
+      [id]: value
+    }))
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -92,132 +104,116 @@ function AnamneseForm({ patient }: { patient: Patient }) {
       const anamneseData = {
         patientId: patient.id,
         respostas: formData,
-        observacoes: formData.observacoes as string
+        observacoes: formData.observacoes
       }
 
       addAnamnese(anamneseData)
-
-      // Mostra mensagem de sucesso
       alert('Anamnese salva com sucesso!')
-      
-      // Redireciona para a lista de pacientes ou outra página relevante
-      router.push('/pacientes')
+      router.push(`/processos/${patient.id}`)
     } catch (error) {
       console.error('Erro ao salvar anamnese:', error)
-      alert('Erro ao salvar anamnese. Tente novamente.')
+      alert('Erro ao salvar anamnese. Por favor, tente novamente.')
     } finally {
       setIsSaving(false)
     }
   }
 
-  const handleInputChange = (questionId: string, value: string | string[]) => {
-    setFormData(prev => ({
-      ...prev,
-      [questionId]: value
-    }))
-  }
-
-  // Agrupa as questões por categoria
-  const questionsByCategory = ANAMNESE_QUESTIONS.reduce((acc, question) => {
-    if (!acc[question.category]) {
-      acc[question.category] = []
-    }
-    acc[question.category].push(question)
-    return acc
-  }, {} as Record<string, AnamneseQuestion[]>)
-
-  // Traduz o nome da categoria
-  const translateCategory = (category: string) => {
-    const translations: Record<string, string> = {
-      dados_pessoais: 'Dados Pessoais e Familiares',
-      historia_musical: 'História Musical',
-      desenvolvimento: 'Desenvolvimento',
-      comportamento: 'Comportamento',
-      saude: 'Saúde',
-      social: 'Aspectos Sociais',
-      preferencias_musicais: 'Preferências Musicais'
-    }
-    return translations[category] || category
-  }
-
   return (
-    <form onSubmit={handleSubmit} className="space-y-3">
-      {Object.entries(questionsByCategory).map(([category, questions]) => (
-        <Card key={category}>
-          <div className="p-3">
-            <h3 className="text-base font-semibold text-gray-900 mb-2">
-              {translateCategory(category)}
-            </h3>
-            <div className="space-y-3">
-              {questions.map((question) => (
-                <div key={question.id} className="space-y-1">
-                  <label className="block text-sm font-medium text-gray-700">
-                    {question.question}
-                  </label>
-                  {question.type === 'text' && (
-                    <textarea
-                      className="w-full p-1.5 border rounded-md resize-none text-sm"
-                      rows={2}
-                      value={formData[question.id] as string || ''}
-                      onChange={(e) => handleInputChange(question.id, e.target.value)}
-                      placeholder="Digite aqui..."
-                    />
-                  )}
-                  {question.type === 'single' && (
-                    <select
-                      className="w-full p-1.5 border rounded-md bg-white text-sm"
-                      value={formData[question.id] as string || ''}
-                      onChange={(e) => handleInputChange(question.id, e.target.value)}
-                    >
-                      <option value="">Selecione...</option>
-                      {question.options?.map((option) => (
-                        <option key={option} value={option}>
-                          {option}
-                        </option>
-                      ))}
-                    </select>
-                  )}
-                  {question.type === 'multiple' && (
-                    <div className="grid grid-cols-2 gap-1.5 text-sm">
-                      {question.options?.map((option) => (
-                        <label key={option} className="flex items-center gap-1.5">
-                          <input
-                            type="checkbox"
-                            checked={Array.isArray(formData[question.id]) && formData[question.id].includes(option)}
-                            onChange={(e) => {
-                              const currentValue = Array.isArray(formData[question.id]) ? formData[question.id] : []
-                              const newValue = e.target.checked
-                                ? [...currentValue, option]
-                                : currentValue.filter(v => v !== option)
-                              handleInputChange(question.id, newValue)
-                            }}
-                            className="rounded border-gray-300 h-3.5 w-3.5"
-                          />
-                          <span className="text-gray-700 text-sm">{option}</span>
-                        </label>
-                      ))}
-                    </div>
-                  )}
-                </div>
+    <form onSubmit={handleSubmit} className="space-y-6">
+      {ANAMNESE_QUESTIONS.map((question) => (
+        <div key={question.id} className="space-y-2">
+          <label className="block text-sm font-medium text-gray-700">
+            {question.question}
+          </label>
+
+          {question.type === 'text' && (
+            <textarea
+              value={formData[question.id] as string || ''}
+              onChange={(e) => handleInputChange(question.id, e.target.value)}
+              rows={3}
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+            />
+          )}
+
+          {question.type === 'date' && (
+            <input
+              type="date"
+              value={formData[question.id] as string || ''}
+              onChange={(e) => handleInputChange(question.id, e.target.value)}
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+            />
+          )}
+
+          {question.type === 'single' && question.options && (
+            <select
+              value={formData[question.id] as string || ''}
+              onChange={(e) => handleInputChange(question.id, e.target.value)}
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+            >
+              <option value="">Selecione uma opção...</option>
+              {question.options.map((option) => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
               ))}
+            </select>
+          )}
+
+          {question.type === 'multiple' && question.options && (
+            <div className="mt-2">
+              <div className="grid grid-cols-2 gap-1.5 text-sm">
+                {question.options.map((option) => (
+                  <label key={option} className="flex items-center gap-1.5">
+                    <input
+                      type="checkbox"
+                      checked={Array.isArray(formData[question.id]) && (formData[question.id] as string[]).includes(option)}
+                      onChange={(e) => {
+                        const currentValue = Array.isArray(formData[question.id]) ? formData[question.id] as string[] : []
+                        const newValue = e.target.checked
+                          ? [...currentValue, option]
+                          : currentValue.filter(v => v !== option)
+                        handleInputChange(question.id, newValue)
+                      }}
+                      className="rounded border-gray-300 h-3.5 w-3.5"
+                    />
+                    {option}
+                  </label>
+                ))}
+              </div>
             </div>
-          </div>
-        </Card>
+          )}
+        </div>
       ))}
 
-      <div className="flex justify-end gap-3 mt-4">
+      <div className="space-y-2">
+        <label className="block text-sm font-medium text-gray-700">
+          Observações Adicionais
+        </label>
+        <textarea
+          value={formData.observacoes || ''}
+          onChange={(e) => handleInputChange('observacoes', e.target.value)}
+          rows={4}
+          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+          placeholder="Adicione quaisquer observações relevantes..."
+        />
+      </div>
+
+      <div className="flex justify-end gap-4">
         <button
           type="button"
           onClick={() => router.back()}
-          className="px-3 py-1.5 text-sm border rounded-md hover:bg-gray-50"
+          className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
         >
           Cancelar
         </button>
-        <AnamnesePDF 
-          patient={patient}
-          data={formData}
-        />
+        <button
+          type="submit"
+          disabled={isSaving}
+          className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 border border-transparent rounded-md shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
+        >
+          {isSaving ? 'Salvando...' : 'Salvar Anamnese'}
+        </button>
       </div>
     </form>
   )
-} 
+}

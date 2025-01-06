@@ -1,7 +1,10 @@
 'use client'
 
 import { Patient } from '@/types'
+import { formatarData } from '@/utils/formatters'
+import { DocumentArrowDownIcon } from '@heroicons/react/24/outline'
 import jsPDF from 'jspdf'
+import html2canvas from 'html2canvas'
 
 interface AvaliacaoPDFProps {
   patient: Patient

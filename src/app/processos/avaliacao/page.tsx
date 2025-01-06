@@ -1,404 +1,233 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { Card } from '@/components/ui/Card'
 import { PatientSelect } from '@/components/processos/PatientSelect'
 import { Patient } from '@/types'
-import { formatarData } from '@/utils/formatters'
-import { ClipboardDocumentCheckIcon, DocumentArrowDownIcon } from '@heroicons/react/24/outline'
-import jsPDF from 'jspdf'
-import { ResultadosGraficos } from '@/components/processos/ResultadosGraficos'
-import { ESCALA_DEMUCA } from '@/data/escalaDemuca'
-import html2canvas from 'html2canvas'
+import { ESCALA_DEMUCA, AvaliacaoCategoria } from '@/types/avaliacao'
 import { Logo } from '@/components/Logo'
+import {
+  Chart as ChartJS,
+  RadialLinearScale,
+  PointElement,
+  LineElement,
+  Filler,
+  Tooltip,
+  Legend,
+} from 'chart.js'
+import { Radar } from 'react-chartjs-2'
+import { useAvaliacoes } from '@/hooks/useAvaliacoes'
+import jsPDF from 'jspdf'
+import html2canvas from 'html2canvas'
 
-const calcularPontuacao = (categoria: typeof ESCALA_DEMUCA[0], avaliacoes: Record<string, string>) => {
-  let total = 0
-  
-  categoria.parametros.forEach(parametro => {
-    const nomeParametro = typeof parametro === 'string' ? parametro : parametro.nome
-    const resposta = avaliacoes[nomeParametro]
-    if (!resposta) return
+ChartJS.register(
+  RadialLinearScale,
+  PointElement,
+  LineElement,
+  Filler,
+  Tooltip,
+  Legend
+)
 
-    let pontos = 0
-    if (resposta === 'nao') pontos = categoria.escala.nao
-    if (resposta === 'pouco') pontos = categoria.escala.pouco
-    if (resposta === 'muito') pontos = categoria.escala.muito
-
-    // Aplica multiplicador se existir
-    if (typeof parametro === 'object' && parametro.multiplicador) {
-      pontos *= parametro.multiplicador
-    }
-
-    total += pontos
-  })
-
-  return total
+interface ChartData {
+  habilidades: string[]
+  categorias: string[]
+  porcentagens: number[]
 }
 
-const calcularPorcentagens = (avaliacoes: Record<string, string>) => {
-  const habilidades = []
-  const categorias = []
+const calcularPorcentagens = (avaliacoes: Record<string, string>): ChartData => {
+  const habilidades: string[] = []
+  const categorias: string[] = []
+  const porcentagens: number[] = []
 
   ESCALA_DEMUCA.forEach(categoria => {
-    const pontuacao = calcularPontuacao(categoria, avaliacoes)
-    const totalPontos = categoria.escala.nao + categoria.escala.pouco + categoria.escala.muito
-    const porcentagem = (pontuacao / totalPontos) * 100
+    let somaCategoria = 0
+    let maxCategoria = 0
 
-    categorias.push({ name: categoria.categoria, value: porcentagem.toFixed(2) })
-
-    categoria.parametros.forEach(parametro => {
-      const nome = typeof parametro === 'string' ? parametro : parametro.nome
-      const valor = avaliacoes[nome] || 'Não avaliado'
-      const pontos = valor === 'nao' ? categoria.escala.nao : valor === 'pouco' ? categoria.escala.pouco : categoria.escala.muito
-      const porcentagem = (pontos / totalPontos) * 100
-
-      habilidades.push({ name: nome, value: porcentagem.toFixed(2) })
+    categoria.habilidades.forEach(habilidade => {
+      const valor = parseInt(avaliacoes[habilidade.id] || '0')
+      const multiplicador = habilidade.multiplicador || 1
+      somaCategoria += valor * multiplicador
+      maxCategoria += 4 * multiplicador // valor máximo da escala
+      habilidades.push(habilidade.nome)
     })
+
+    const porcentagem = (somaCategoria / maxCategoria) * 100
+    porcentagens.push(porcentagem)
+    categorias.push(categoria.nome)
   })
 
-  return { habilidades, categorias }
+  return { habilidades, categorias, porcentagens }
 }
 
 export default function AvaliacaoPage() {
+  const router = useRouter()
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null)
-  const [avaliacoes, setAvaliacoes] = useState<Record<string, string>>({})
-  const [observacoes, setObservacoes] = useState('')
-  const pieChartRef = useRef<HTMLDivElement>(null)
-  const barChartRef = useRef<HTMLDivElement>(null)
+  const { avaliacoes } = useAvaliacoes()
+
+  const avaliacaoAtual = selectedPatient 
+    ? avaliacoes.find(a => a.patientId === selectedPatient.id)
+    : null
+
+  const chartData = avaliacaoAtual 
+    ? calcularPorcentagens(avaliacaoAtual.respostas)
+    : { habilidades: [], categorias: [], porcentagens: [] }
+
+  const data = {
+    labels: chartData.categorias,
+    datasets: [
+      {
+        label: 'Desenvolvimento Musical',
+        data: chartData.porcentagens,
+        backgroundColor: 'rgba(99, 102, 241, 0.2)',
+        borderColor: 'rgb(99, 102, 241)',
+        borderWidth: 1,
+      },
+    ],
+  }
+
+  const options = {
+    scales: {
+      r: {
+        angleLines: {
+          display: true,
+        },
+        suggestedMin: 0,
+        suggestedMax: 100,
+      },
+    },
+  }
 
   const gerarPDF = async () => {
-    if (!selectedPatient) return
+    if (!selectedPatient || !avaliacaoAtual) return
 
     const doc = new jsPDF()
-    
-    // Função auxiliar para adicionar retângulo com cor de fundo
-    const addColoredRect = (y: number, height: number, color: string) => {
-      doc.setFillColor(color)
-      doc.rect(0, y, doc.internal.pageSize.getWidth(), height, 'F')
+    const chartRef = document.querySelector('.radar-chart') as HTMLElement
+
+    if (chartRef) {
+      const canvas = await html2canvas(chartRef)
+      const imgData = canvas.toDataURL('image/png')
+      doc.addImage(imgData, 'PNG', 20, 40, 170, 100)
     }
 
-    // Adiciona a logo
-    try {
-      const logoPath = '/logo-musicoterapia.png'
-      const response = await fetch(logoPath)
-      const blob = await response.blob()
-      const reader = new FileReader()
-      
-      await new Promise((resolve) => {
-        reader.onload = () => {
-          if (reader.result) {
-            doc.addImage(reader.result as string, 'PNG', 10, 10, 20, 20)
-          }
-          resolve(null)
-        }
-        reader.readAsDataURL(blob)
-      })
-    } catch (error) {
-      console.error('Erro ao carregar a logo:', error)
-    }
+    doc.setFontSize(20)
+    doc.setTextColor('#111827')
+    doc.text('Avaliação DEMUCA', 105, 20, { align: 'center' })
 
-    // Cabeçalho
-    addColoredRect(0, 40, '#f3f4f6')
-    doc.setFontSize(24)
-    doc.setTextColor('#1f2937')
-    doc.text('ESCALA PARA AVALIAÇÃO TEA', 105, 25, { align: 'center' })
-    
-    let yPos = 50
-
-    // Informações do paciente
-    doc.setFillColor('#ffffff')
-    doc.setDrawColor('#e5e7eb')
-    doc.roundedRect(10, yPos, doc.internal.pageSize.getWidth() - 20, 40, 3, 3, 'FD')
-    
     doc.setFontSize(12)
     doc.setTextColor('#374151')
-    yPos += 15
-    doc.text(`Paciente: ${selectedPatient.nome}`, 20, yPos)
-    yPos += 10
-    doc.text(`Data de Nascimento: ${formatarData(selectedPatient.dataNascimento)}`, 20, yPos)
-    doc.text(`Data da Avaliação: ${new Date().toLocaleDateString()}`, doc.internal.pageSize.getWidth() - 20, yPos, { align: 'right' })
-    
-    yPos += 25
+    doc.text(`Paciente: ${selectedPatient.name}`, 20, 30)
+    doc.text(`Data: ${new Date().toLocaleDateString()}`, 20, 35)
 
-    // Resultados da avaliação
-    doc.setFontSize(16)
-    doc.setTextColor('#1f2937')
-    doc.text('Resultados da Avaliação', 105, yPos, { align: 'center' })
-    
-    yPos += 15
+    let yPos = 150
 
-    // Adiciona os resultados de cada categoria
-    ESCALA_DEMUCA.forEach((categoria, index) => {
-      // Adiciona fundo alternado para cada categoria
-      const isEven = index % 2 === 0
-      addColoredRect(yPos - 5, 25, isEven ? '#f9fafb' : '#ffffff')
-
+    ESCALA_DEMUCA.forEach(categoria => {
       doc.setFontSize(14)
       doc.setTextColor('#1f2937')
-      doc.text(categoria.categoria, 20, yPos)
-      
+      doc.text(categoria.nome, 20, yPos)
       yPos += 10
-      doc.setFontSize(10)
-      doc.setTextColor('#4b5563')
 
-      categoria.parametros.forEach(parametro => {
-        const nome = typeof parametro === 'string' ? parametro : parametro.nome
-        const multiplicador = typeof parametro === 'string' ? '' : ' (2x)'
-        const valor = avaliacoes[nome] || 'Não avaliado'
+      categoria.habilidades.forEach(habilidade => {
+        const valor = avaliacaoAtual.respostas[habilidade.id] || '0'
+        const porcentagem = (parseInt(valor) / 4) * 100
 
-        // Cria uma caixa para cada resposta
-        const text = `${nome}${multiplicador}: ${valor}`
-        doc.setDrawColor('#e5e7eb')
-        doc.setFillColor('#ffffff')
-        doc.roundedRect(30, yPos - 4, 150, 8, 1, 1, 'FD')
-        doc.text(text, 35, yPos)
+        doc.setFontSize(10)
+        doc.setTextColor('#4b5563')
+        doc.text(`${habilidade.nome}: ${porcentagem.toFixed(1)}%`, 30, yPos)
+        yPos += 6
 
-        yPos += 10
-
-        // Adiciona nova página se necessário
-        if (yPos > doc.internal.pageSize.getHeight() - 20) {
+        if (yPos > doc.internal.pageSize.height - 20) {
           doc.addPage()
           yPos = 20
         }
       })
-      yPos += 5
+
+      yPos += 10
     })
 
-    // Nova página para os gráficos
-    doc.addPage()
-    yPos = 20
-
-    // Título da página de gráficos
-    addColoredRect(0, 40, '#f3f4f6')
-    doc.setFontSize(20)
-    doc.setTextColor('#1f2937')
-    doc.text('Visualização Gráfica dos Resultados', 105, 25, { align: 'center' })
-
-    // Captura e adiciona o gráfico de pizza
-    if (pieChartRef.current) {
-      const pieCanvas = await html2canvas(pieChartRef.current)
-      const pieImgData = pieCanvas.toDataURL('image/png')
-      doc.addImage(pieImgData, 'PNG', 20, 50, 170, 100)
-    }
-
-    // Captura e adiciona o gráfico de barras
-    if (barChartRef.current) {
-      const barCanvas = await html2canvas(barChartRef.current)
-      const barImgData = barCanvas.toDataURL('image/png')
-      doc.addImage(barImgData, 'PNG', 20, 160, 170, 100)
-    }
-
-    // Rodapé
-    const yPosAssinatura = doc.internal.pageSize.getHeight() - 40
-    addColoredRect(yPosAssinatura, 40, '#f3f4f6')
-    doc.setFontSize(10)
-    doc.setTextColor('#4b5563')
-    doc.text('_'.repeat(50), 20, yPosAssinatura + 15)
-    doc.text('Assinatura do Profissional', 20, yPosAssinatura + 25)
-    doc.text(new Date().toLocaleDateString(), doc.internal.pageSize.getWidth() - 20, yPosAssinatura + 25, { align: 'right' })
-
-    // Salva o PDF
-    doc.save(`avaliacao_${selectedPatient.nome}_${new Date().toISOString().split('T')[0]}.pdf`)
-  }
-
-  const handleAvaliacaoChange = (parametro: string, valor: string) => {
-    setAvaliacoes(prev => ({
-      ...prev,
-      [parametro]: valor
-    }))
+    doc.save(`avaliacao_${selectedPatient.name}_${new Date().toISOString().split('T')[0]}.pdf`)
   }
 
   return (
     <div className="min-h-screen bg-gray-50 py-4 sm:py-8">
       <div className="max-w-7xl mx-auto px-2 sm:px-4 md:px-6 lg:px-8">
         <div className="flex justify-between items-center mb-6">
-          <Logo />
-          <div className="flex gap-4">
-            <button
-              onClick={gerarPDF}
-              className="flex items-center gap-2 px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors"
-            >
-              <DocumentArrowDownIcon className="w-5 h-5" />
-              Gerar PDF
-            </button>
-          </div>
+          <Logo size="sm" />
+          <button
+            onClick={gerarPDF}
+            className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+            disabled={!selectedPatient || !avaliacaoAtual}
+          >
+            Gerar PDF
+          </button>
         </div>
 
         <Card>
-          <div className="p-4 sm:p-6 md:p-8">
-            <div className="space-y-6 sm:space-y-8">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
-                <div>
-                  <label className="block text-sm font-medium text-gray-900 mb-2">
-                    Paciente
-                  </label>
-                  <PatientSelect
-                    onSelect={setSelectedPatient}
-                    selectedId={selectedPatient?.id}
-                    className="w-full"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-900 mb-2">
-                    Número da Avaliação
-                  </label>
-                  <div className="relative">
-                    <select
-                      value={'1'}
-                      onChange={(e) => {}}
-                      className="block w-full rounded-lg border-gray-300 py-2.5 pl-3 pr-10 text-gray-900 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 sm:text-sm"
-                    >
-                      <option value="1">Avaliação 1</option>
-                      <option value="2">Avaliação 2</option>
-                      <option value="3">Avaliação 3</option>
-                      <option value="4">Avaliação 4</option>
-                      <option value="5">Avaliação 5</option>
-                    </select>
+          <div className="p-6">
+            <h1 className="text-2xl font-bold text-gray-900 mb-6">Avaliação DEMUCA</h1>
+            
+            <div className="space-y-6">
+              <div>
+                <div className="flex items-end gap-4">
+                  <div className="flex-1">
+                    <PatientSelect
+                      onSelect={setSelectedPatient}
+                      selectedId={selectedPatient?.id}
+                    />
                   </div>
                 </div>
               </div>
 
-              {selectedPatient && (
-                <div className="mt-6 sm:mt-8 space-y-4 sm:space-y-6">
-                  <div className="bg-white rounded-lg border border-gray-200 p-3 sm:p-4">
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-0">
-                      <div>
-                        <h3 className="text-base sm:text-lg font-semibold text-gray-900">
-                          {selectedPatient.nome}
-                        </h3>
-                        <p className="mt-1 text-xs sm:text-sm text-gray-600">
-                          Data de Nascimento: {formatarData(selectedPatient.dataNascimento)}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-2 bg-indigo-50 px-2 sm:px-3 py-1.5 rounded-lg">
-                        <ClipboardDocumentCheckIcon className="h-4 sm:h-5 w-4 sm:w-5 text-indigo-600" />
-                        <span className="text-xs sm:text-sm font-medium text-indigo-700">Avaliação 1</span>
-                      </div>
+              {selectedPatient && avaliacaoAtual && (
+                <div className="mt-6">
+                  <h2 className="text-lg font-semibold text-gray-900 mb-4">
+                    Avaliação de {selectedPatient.name}
+                  </h2>
+                  <div className="w-full max-w-2xl mx-auto radar-chart">
+                    <Radar data={data} options={options} />
+                  </div>
+                  <div className="mt-6">
+                    <h3 className="text-base font-medium text-gray-900 mb-3">
+                      Detalhamento por Habilidade
+                    </h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {chartData.habilidades.map((habilidade, index) => (
+                        <div key={index} className="bg-white p-4 rounded-lg shadow">
+                          <div className="text-sm font-medium text-gray-700">{habilidade}</div>
+                          <div className="mt-1 flex items-center">
+                            <div className="flex-1 bg-gray-200 rounded-full h-2">
+                              <div
+                                className="bg-indigo-600 h-2 rounded-full"
+                                style={{ width: `${chartData.porcentagens[index]}%` }}
+                              />
+                            </div>
+                            <span className="ml-2 text-sm text-gray-600">
+                              {chartData.porcentagens[index].toFixed(1)}%
+                            </span>
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
+                </div>
+              )}
 
-                  <div className="space-y-6">
-                    {ESCALA_DEMUCA.map((categoria, categoriaIndex) => (
-                      <div key={categoriaIndex} className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-                        <div className="bg-gray-100 p-3 sm:p-4 border-b border-gray-200">
-                          <h3 className="text-sm sm:text-base font-semibold text-gray-900">
-                            {categoria.categoria}
-                          </h3>
-                        </div>
-                        <div className="overflow-x-auto">
-                          <table className="min-w-full divide-y divide-gray-200">
-                            <thead>
-                              <tr className="bg-gray-50">
-                                <th scope="col" className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs sm:text-sm font-semibold text-gray-900 w-2/4">
-                                  Parâmetros
-                                </th>
-                                <th scope="col" className="px-2 sm:px-3 py-2 sm:py-3 text-center text-xs sm:text-sm font-semibold text-gray-900">
-                                  Não
-                                </th>
-                                <th scope="col" className="px-2 sm:px-3 py-2 sm:py-3 text-center text-xs sm:text-sm font-semibold text-gray-900">
-                                  Pouco
-                                </th>
-                                <th scope="col" className="px-2 sm:px-3 py-2 sm:py-3 text-center text-xs sm:text-sm font-semibold text-gray-900">
-                                  Muito
-                                </th>
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-200 bg-white">
-                              {categoria.parametros.map((parametro, index) => (
-                                <tr 
-                                  key={typeof parametro === 'string' ? parametro : parametro.nome}
-                                  className="hover:bg-gray-50 transition-colors duration-150"
-                                >
-                                  <td className="whitespace-normal px-2 sm:px-3 py-2 sm:py-3 text-xs sm:text-sm text-gray-700">
-                                    <div className="flex items-center gap-1 sm:gap-2">
-                                      <span>{typeof parametro === 'string' ? parametro : parametro.nome}</span>
-                                      {typeof parametro === 'object' && parametro.multiplicador === 2 && (
-                                        <span className="inline-flex items-center rounded-md bg-red-50 px-1.5 sm:px-2 py-0.5 sm:py-1 text-xs font-medium text-red-700 ring-1 ring-inset ring-red-600/10">
-                                          x2
-                                        </span>
-                                      )}
-                                    </div>
-                                  </td>
-                                  {['nao', 'pouco', 'muito'].map((valor) => (
-                                    <td key={valor} className="whitespace-normal px-2 sm:px-3 py-2 sm:py-3 text-xs sm:text-sm text-center">
-                                      <div className="flex justify-center">
-                                        <input
-                                          type="radio"
-                                          name={typeof parametro === 'string' ? parametro : parametro.nome}
-                                          value={valor}
-                                          checked={avaliacoes[typeof parametro === 'string' ? parametro : parametro.nome] === valor}
-                                          onChange={() => handleAvaliacaoChange(typeof parametro === 'string' ? parametro : parametro.nome, valor)}
-                                          className={`w-4 sm:w-5 h-4 sm:h-5 cursor-pointer appearance-none rounded-full transition-all duration-200 ease-in-out
-                                            ${valor === 'nao' 
-                                              ? `border-2 border-red-500 ${
-                                                  avaliacoes[typeof parametro === 'string' ? parametro : parametro.nome] === valor 
-                                                    ? 'bg-red-500 ring-2 ring-red-200' 
-                                                    : 'bg-white hover:bg-red-50'
-                                                }` 
-                                              : valor === 'pouco'
-                                              ? `border-2 border-yellow-500 ${
-                                                  avaliacoes[typeof parametro === 'string' ? parametro : parametro.nome] === valor 
-                                                    ? 'bg-yellow-500 ring-2 ring-yellow-200' 
-                                                    : 'bg-white hover:bg-yellow-50'
-                                                }`
-                                              : `border-2 border-green-500 ${
-                                                  avaliacoes[typeof parametro === 'string' ? parametro : parametro.nome] === valor 
-                                                    ? 'bg-green-500 ring-2 ring-green-200' 
-                                                    : 'bg-white hover:bg-green-50'
-                                                }`
-                                            }`}
-                                        />
-                                      </div>
-                                    </td>
-                                  ))}
-                                </tr>
-                              ))}
-                              <tr className="bg-gray-50">
-                                <td className="whitespace-normal px-2 sm:px-3 py-2 sm:py-3 text-xs sm:text-sm font-medium text-gray-700 text-right">
-                                  Pontuação
-                                </td>
-                                <td className="whitespace-normal px-2 sm:px-3 py-2 sm:py-3 text-xs sm:text-sm font-medium text-gray-900 text-center">
-                                  {categoria.escala.nao}
-                                </td>
-                                <td className="whitespace-normal px-2 sm:px-3 py-2 sm:py-3 text-xs sm:text-sm font-medium text-gray-900 text-center">
-                                  {categoria.escala.pouco}
-                                </td>
-                                <td className="whitespace-normal px-2 sm:px-3 py-2 sm:py-3 text-xs sm:text-sm font-medium text-gray-900 text-center">
-                                  {categoria.escala.muito}
-                                </td>
-                              </tr>
-                            </tbody>
-                          </table>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+              {!selectedPatient && (
+                <div className="text-center py-6 text-gray-500">
+                  Selecione um paciente para visualizar sua avaliação DEMUCA
+                </div>
+              )}
 
-                  <div className="flex flex-col sm:flex-row justify-end gap-2 sm:gap-4 mt-6 sm:mt-8">
-                    <button
-                      type="button"
-                      className="w-full sm:w-auto inline-flex items-center justify-center px-3 sm:px-4 py-2 text-xs sm:text-sm font-semibold text-gray-700 bg-white border border-gray-300 rounded-lg shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors duration-150"
-                    >
-                      Cancelar
-                    </button>
-                    <button
-                      type="button"
-                      onClick={gerarPDF}
-                      className="w-full sm:w-auto inline-flex items-center justify-center px-3 sm:px-4 py-2 text-xs sm:text-sm font-semibold text-white bg-green-600 border border-transparent rounded-lg shadow-sm hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-colors duration-150"
-                    >
-                      <DocumentArrowDownIcon className="h-4 sm:h-5 w-4 sm:w-5 mr-2" />
-                      Baixar Avaliação
-                    </button>
-                  </div>
+              {selectedPatient && !avaliacaoAtual && (
+                <div className="text-center py-6 text-gray-500">
+                  Nenhuma avaliação encontrada para este paciente
                 </div>
               )}
             </div>
           </div>
         </Card>
       </div>
-      {selectedPatient && <ResultadosGraficos avaliacoes={avaliacoes} pieChartRef={pieChartRef} barChartRef={barChartRef}/>}
     </div>
   )
 }

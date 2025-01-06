@@ -1,20 +1,41 @@
 export type Diagnostico = 
-  | 'TEA' 
-  | 'TDAH' 
-  | 'Alzheimer'
-  | 'Depressão'
-  | 'Ansiedade'
-  | 'Paralisia_Cerebral'
-  | 'Sindrome_Down'
-  | 'AVE'
-  | 'Parkinson'
-  | 'Esquizofrenia'
-  | 'Demencia'
-  | 'Deficiencia_Intelectual'
-  | 'Deficiencia_Auditiva'
-  | 'Deficiencia_Visual'
-  | 'DPAC'
-  | 'Outro'
+  'TEA' | 
+  'TDAH' | 
+  'Deficiencia_Intelectual' |
+  'Sindrome_Down' |
+  'Paralisia_Cerebral' |
+  'AVE' |
+  'Parkinson' |
+  'Alzheimer' |
+  'Demencia' |
+  'Depressão' |
+  'Ansiedade' |
+  'Esquizofrenia' |
+  'Deficiencia_Auditiva' |
+  'Deficiencia_Visual' |
+  'DPAC' |
+  'Outro'
+
+interface Objetivo {
+  texto: string
+  categoria: string
+}
+
+interface Semana {
+  semana: string
+  atividades: string[]
+  objetivos: string[]
+}
+
+export interface PlanoTerapeutico {
+  pacienteId?: string
+  identificacao: {
+    dataInicio: string
+    dataReavaliacao?: string
+  }
+  objetivos: Objetivo[]
+  cronograma: Semana[]
+}
 
 export interface ObjetivoPadrao {
   id: string
@@ -384,46 +405,3 @@ export const ATIVIDADES_PADRAO: AtividadePadrao[] = [
     categoria: 'percepcao'
   }
 ]
-
-export interface PlanoTerapeutico {
-  id: string
-  patientId: string
-  identificacao: {
-    nome: string
-    idade: number
-    diagnostico: string
-    dataInicio: Date
-    dataReavaliacao: Date
-  }
-  objetivosGerais: string[]
-  objetivosEspecificos: {
-    interacaoSocial: string[]
-    exploracaoSonora: string[]
-    movimentacaoCorporal: string[]
-    exploracaoVocal: string[]
-    comportamentosRestritivos: string[]
-  }
-  atividades: Array<{
-    id: string
-    nome: string
-    objetivo: string
-    descricao: string
-    categoria: 'interacao' | 'percepcao' | 'movimento' | 'vocal' | 'comportamento'
-  }>
-  cronograma: Array<{
-    semana: string
-    atividades: string[]
-    objetivos: string[]
-  }>
-  avaliacoes: Array<{
-    data: Date
-    participacao: number // 1-5
-    respostasSociais: number // 1-5
-    comportamentosRestritivos: number // 1-5
-    observacoes: string
-  }>
-  observacoesGerais: string
-  status: 'ativo' | 'concluido' | 'em_revisao'
-  createdAt: Date
-  updatedAt: Date
-} 

@@ -1,9 +1,10 @@
-import NextAuth, { AuthOptions } from 'next-auth'
+import NextAuth from 'next-auth'
 import CredentialsProvider from 'next-auth/providers/credentials'
 import { prisma } from '@/lib/prisma'
 import bcrypt from 'bcryptjs'
+import { NextAuthOptions } from 'next-auth'
 
-export const authOptions: AuthOptions = {
+export const authOptions: NextAuthOptions = {
   providers: [
     CredentialsProvider({
       name: 'credentials',
@@ -13,7 +14,7 @@ export const authOptions: AuthOptions = {
       },
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) {
-          throw new Error('Email e senha são obrigatórios')
+          throw new Error('Por favor, preencha todos os campos')
         }
 
         const user = await prisma.user.findUnique({
@@ -23,49 +24,53 @@ export const authOptions: AuthOptions = {
         })
 
         if (!user || !user.password) {
-          console.log('Usuário não encontrado:', credentials.email)
-          return null
+          console.log('Tentativa de login com email não cadastrado:', credentials.email)
+          throw new Error('Credenciais inválidas')
         }
 
         const isValid = await bcrypt.compare(credentials.password, user.password)
 
         if (!isValid) {
-          console.log('Senha inválida para o usuário:', credentials.email)
-          return null
+          console.log('Tentativa de login com senha incorreta para:', credentials.email)
+          throw new Error('Credenciais inválidas')
         }
 
         return {
           id: user.id,
           email: user.email,
-          name: user.name
+          name: user.name,
+          role: user.role
         }
       }
     })
   ],
-  pages: {
-    signIn: '/'
-  },
-  session: {
-    strategy: 'jwt',
-    maxAge: 30 * 24 * 60 * 60, // 30 days
-  },
   callbacks: {
     async jwt({ token, user }) {
       if (user) {
+        token.role = user.role
         token.id = user.id
       }
       return token
     },
     async session({ session, token }) {
       if (session.user) {
+        session.user.role = token.role as string
         session.user.id = token.id as string
       }
       return session
     }
   },
-  secret: process.env.NEXTAUTH_SECRET
+  pages: {
+    signIn: '/',
+    error: '/auth/error'
+  },
+  session: {
+    strategy: 'jwt',
+    maxAge: 30 * 24 * 60 * 60, // 30 days
+  },
+  secret: process.env.NEXTAUTH_SECRET,
+  debug: process.env.NODE_ENV === 'development'
 }
 
 const handler = NextAuth(authOptions)
-export const GET = handler.GET
-export const POST = handler.POST
+export { handler as GET, handler as POST }

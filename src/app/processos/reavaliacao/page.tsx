@@ -166,10 +166,11 @@ function ReavaliacaoForm({ patient }: { patient: Patient }) {
                             type="checkbox"
                             checked={Array.isArray(formData[question.id]) && formData[question.id].includes(option)}
                             onChange={(e) => {
-                              const currentValue = Array.isArray(formData[question.id]) ? formData[question.id] : []
+                              const currentValue = formData[question.id] || []
+                              const currentArray = Array.isArray(currentValue) ? currentValue : [currentValue]
                               const newValue = e.target.checked
-                                ? [...currentValue, option]
-                                : currentValue.filter(v => v !== option)
+                                ? [...currentArray, option]
+                                : currentArray.filter(v => v !== option)
                               handleInputChange(question.id, newValue)
                             }}
                             className="rounded border-gray-300 h-3.5 w-3.5"

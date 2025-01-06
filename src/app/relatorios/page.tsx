@@ -1,6 +1,7 @@
 'use client'
 
 import { RelatorioForm } from '@/components/relatorios/RelatorioForm'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 
 export default function RelatoriosPage() {
@@ -8,30 +9,34 @@ export default function RelatoriosPage() {
 
   const handleSubmit = async (data: any) => {
     try {
-      const relatorios = JSON.parse(localStorage.getItem('relatorios') || '[]')
-      relatorios.push({
-        ...data,
-        id: crypto.randomUUID(),
-        createdAt: new Date().toISOString()
+      const response = await fetch('/api/relatorios', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
       })
-      localStorage.setItem('relatorios', JSON.stringify(relatorios))
-      
-      router.push('/relatorios/lista')
+
+      if (!response.ok) {
+        throw new Error('Erro ao salvar relatório')
+      }
+
+      router.push('/relatorios')
     } catch (error) {
-      console.error('Erro ao salvar relatório:', error)
+      console.error('Erro:', error)
     }
   }
 
   return (
-    <div className="max-w-4xl mx-auto py-6 px-4">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Novo Relatório</h1>
-        <p className="mt-1 text-sm text-gray-500">
-          Preencha os campos abaixo para gerar o relatório
-        </p>
+    <div className="min-h-screen bg-gray-50 py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <h1 className="text-2xl font-semibold text-gray-900 mb-6">Relatórios</h1>
       </div>
 
-      <RelatorioForm onSubmit={handleSubmit} />
+      <RelatorioForm 
+        onSubmit={handleSubmit} 
+        tipo="sessao"
+      />
     </div>
   )
-} 
+}
