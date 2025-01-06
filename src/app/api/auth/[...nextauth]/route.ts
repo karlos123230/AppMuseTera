@@ -1,34 +1,36 @@
-import NextAuth from 'next-auth'
-import CredentialsProvider from 'next-auth/providers/credentials'
-import { prisma } from '@/lib/prisma'
-import bcrypt from 'bcryptjs'
-import type { NextAuthOptions } from 'next-auth'
+import NextAuth from "next-auth"
+import { type NextAuthOptions } from "next-auth"
+import CredentialsProvider from "next-auth/providers/credentials"
+import { prisma } from "@/lib/prisma"
+import bcrypt from "bcryptjs"
 
-export const GET = NextAuth({
+const handler = NextAuth({
   providers: [
     CredentialsProvider({
-      name: 'credentials',
       credentials: {
-        email: { label: 'Email', type: 'email' },
-        password: { label: 'Password', type: 'password' }
+        email: { type: "email" },
+        password: { type: "password" }
       },
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) {
-          throw new Error('Please fill in all fields')
+          return null
         }
 
         const user = await prisma.user.findUnique({
           where: { email: credentials.email }
         })
 
-        if (!user || !user.password) {
-          throw new Error('Invalid credentials')
+        if (!user?.password) {
+          return null
         }
 
-        const isValid = await bcrypt.compare(credentials.password, user.password)
+        const passwordValid = await bcrypt.compare(
+          credentials.password,
+          user.password
+        )
 
-        if (!isValid) {
-          throw new Error('Invalid credentials')
+        if (!passwordValid) {
+          return null
         }
 
         return {
@@ -40,27 +42,26 @@ export const GET = NextAuth({
       }
     })
   ],
-  pages: {
-    signIn: '/',
-    error: '/auth/error'
-  },
   callbacks: {
-    async jwt({ token, user }) {
+    jwt({ token, user }) {
       if (user) {
         token.id = user.id
         token.professionalRegister = user.professionalRegister
       }
       return token
     },
-    async session({ session, token }) {
+    session({ session, token }) {
       if (session.user) {
         session.user.id = token.id
-        session.user.professionalRegister = token.professionalRegister as string | null
+        session.user.professionalRegister = token.professionalRegister
       }
       return session
     }
   },
-  session: { strategy: 'jwt' }
+  pages: {
+    signIn: "/",
+    error: "/auth/error"
+  }
 })
 
-export const POST = GET
+export { handler as GET, handler as POST }
