@@ -443,9 +443,9 @@ export function RelatorioForm({ onSubmit, initialData, tipo }: RelatorioFormProp
   };
 
   const handleTipoChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const value = e.target.value
-    if (isTipoRelatorio(value)) {
-      setTipoRelatorio(value)
+    const selectedValue = e.target.value as TipoRelatorio
+    if (TIPOS_RELATORIO.some(t => t.id === selectedValue)) {
+      setTipoRelatorio(selectedValue)
     }
   }
 
