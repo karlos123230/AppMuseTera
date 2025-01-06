@@ -11,14 +11,14 @@ import jsPDF from 'jspdf';
 
 type TipoRelatorio = 'sessao' | 'reavaliacao' | 'alta' | 'avaliacao_inicial' | 'evolucao_mensal' | 'evolucao_semestral' | 'familia' | 'equipe'
 
-const TIPOS_RELATORIO = [
-  { id: 'sessao' as TipoRelatorio, label: 'Relatório de Sessão' },
-  { id: 'evolucao_mensal' as TipoRelatorio, label: 'Relatório de Evolução Mensal' },
-  { id: 'evolucao_semestral' as TipoRelatorio, label: 'Relatório de Evolução Semestral' },
-  { id: 'avaliacao_inicial' as TipoRelatorio, label: 'Relatório de Avaliação' },
-  { id: 'alta' as TipoRelatorio, label: 'Relatório de Alta' },
-  { id: 'familia' as TipoRelatorio, label: 'Relatório para Família' },
-  { id: 'equipe' as TipoRelatorio, label: 'Relatório para Equipe' }
+const TIPOS_RELATORIO: Array<{ id: TipoRelatorio; label: string }> = [
+  { id: 'sessao', label: 'Relatório de Sessão' },
+  { id: 'evolucao_mensal', label: 'Relatório de Evolução Mensal' },
+  { id: 'evolucao_semestral', label: 'Relatório de Evolução Semestral' },
+  { id: 'avaliacao_inicial', label: 'Relatório de Avaliação' },
+  { id: 'alta', label: 'Relatório de Alta' },
+  { id: 'familia', label: 'Relatório para Família' },
+  { id: 'equipe', label: 'Relatório para Equipe' }
 ]
 
 // Campos específicos por tipo de relatório
@@ -438,6 +438,11 @@ export function RelatorioForm({ onSubmit, initialData, tipo }: RelatorioFormProp
     doc.save(nomeArquivo);
   };
 
+  const handleTipoChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const value = e.target.value as TipoRelatorio | ''
+    setTipoRelatorio(value)
+  }
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (!selectedPatient) return
@@ -469,7 +474,7 @@ export function RelatorioForm({ onSubmit, initialData, tipo }: RelatorioFormProp
             <select
               className="w-full p-2 border rounded-lg"
               value={tipoRelatorio}
-              onChange={(e) => setTipoRelatorio(e.target.value as TipoRelatorio)}
+              onChange={handleTipoChange}
               required
             >
               <option value="">Selecione o tipo de relatório...</option>
