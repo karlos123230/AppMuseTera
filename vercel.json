@@ -1,0 +1,18 @@
+{
+  "version": 2,
+  "buildCommand": "npx prisma generate && next build",
+  "installCommand": "npm install",
+  "framework": "nextjs",
+  "builds": [
+    {
+      "src": "package.json",
+      "use": "@vercel/next"
+    }
+  ],
+  "env": {
+    "NEXTAUTH_URL": "https://tera-karlosviolinn-gmailcoms-projects.vercel.app",
+    "NEXTAUTH_SECRET": "401819c3489ee4e4ac849a8f4910897f51b8798c21b35054c040eeed2d850f13",
+    "NEXT_PUBLIC_SUPABASE_URL": "https://tbxqkjybwaenhmlnqpyy.supabase.co",
+    "NEXT_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRieHFranlid2FlbmhtbG5xcHl5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzUwNDE4OTksImV4cCI6MjA1MDYxNzg5OX0.qru-zJnaojk6xGENV8e1Vp9YYIt5ep8Ejh86vwvFlbk"
+  }
+}

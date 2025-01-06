@@ -1,4 +1,4 @@
-// File: C:\Users\karlos\Desktop\tera\src\app\processos\plano\page.tsx
+// File: c:\Users\karlos\Desktop\tera\src\app\processos\plano\page.tsx
 import * as entry from '../../../../../src/app/processos/plano/page.js'
 import type { ResolvingMetadata, ResolvingViewport } from 'next/dist/lib/metadata/types/metadata-interface.js'
 
