@@ -321,11 +321,13 @@ interface RelatorioFormProps {
 export function RelatorioForm({ onSubmit, initialData, tipo }: RelatorioFormProps) {
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null)
   const [formData, setFormData] = useState(initialData || {})
-  const [tipoRelatorio, setTipoRelatorio] = useState(tipo)
+  const [tipoRelatorio, setTipoRelatorio] = useState<TipoRelatorio>(tipo)
 
-  const handleTipoChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const value = e.target.value
-    setTipoRelatorio(value as TipoRelatorio)
+  const handleSelectChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const novoTipo = TIPOS_RELATORIO.find(t => t.id === e.target.value)?.id
+    if (novoTipo) {
+      setTipoRelatorio(novoTipo)
+    }
   }
 
   const handleInputChange = (secao: string, campo: string, valor: any) => {
@@ -474,7 +476,7 @@ export function RelatorioForm({ onSubmit, initialData, tipo }: RelatorioFormProp
             <select
               className="w-full p-2 border rounded-lg"
               value={tipoRelatorio}
-              onChange={handleTipoChange}
+              onChange={handleSelectChange}
               required
             >
               <option value="">Selecione o tipo de relatório...</option>
